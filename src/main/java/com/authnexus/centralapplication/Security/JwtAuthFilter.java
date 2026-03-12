@@ -33,7 +33,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtServices jwtService;
     private final UserRepository userRepository;
-    Logger logger = LoggerFactory.getLogger(JwtAuthFilter.class);
+    private Logger logger = LoggerFactory.getLogger(JwtAuthFilter.class);
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
