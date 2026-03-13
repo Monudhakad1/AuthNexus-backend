@@ -41,10 +41,8 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth ->
                         auth
-                                .requestMatchers(HttpMethod.POST, "/api/v1/auth/register").permitAll()
-                                .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
-                                .requestMatchers(HttpMethod.POST, "/api/v1/auth/refresh").permitAll()
-                                .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout").permitAll()
+                                .requestMatchers(appConstant.AUTH_PUBLIC_URLS).permitAll()
+
                                 .anyRequest().authenticated()
                 ).oauth2Login(oauth2 ->
                         oauth2.successHandler(oauth2SuccessHandler)
