@@ -1,6 +1,5 @@
 package com.authnexus.centralapplication.Security;
 
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.Getter;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,11 +17,11 @@ public class CookieService {
     private final String cookieDomain;
     private final String cookieSameSite;
 
-    public CookieService(@Value("${security.jwt.refresh-token-cookie-name} ") String refreshTokenCookieName,
-                         @Value("${security.jwt.cookie-same-site} ")String cookieSameSite,
-                         @Value("${security.jwt.cookie-http-only} ") boolean cookieHttpOnly,
-                         @Value("${security.jwt.cookie-secure} ")boolean cookieSecure,
-                         @Value("${security.jwt.cookie-domain} ")String cookieDomain) {
+    public CookieService(@Value("${security.jwt.refresh-token-cookie-name}") String refreshTokenCookieName,
+                         @Value("${security.jwt.cookie-same-site}")String cookieSameSite,
+                         @Value("${security.jwt.cookie-http-only}") boolean cookieHttpOnly,
+                         @Value("${security.jwt.cookie-secure}")boolean cookieSecure,
+                         @Value("${security.jwt.cookie-domain}")String cookieDomain) {
 
         this.refreshTokenCookieName = refreshTokenCookieName;
         this.cookieHttpOnly = cookieHttpOnly;
@@ -31,7 +30,7 @@ public class CookieService {
         this.cookieSameSite = cookieSameSite;
     }
     //method to attach cookie to response
-    public void attackRefreshCookie(HttpServletResponse response , String val, int maxAge ){
+    public void attachRefreshCookie(HttpServletResponse response , String val, int maxAge ){
         var cookie = ResponseCookie.from(refreshTokenCookieName, val)
                 .httpOnly(cookieHttpOnly)
                 .secure(cookieSecure)

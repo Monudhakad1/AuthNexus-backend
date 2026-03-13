@@ -1,8 +1,8 @@
 package com.authnexus.centralapplication.config;
 
 import com.authnexus.centralapplication.Security.JwtAuthFilter;
+import com.authnexus.centralapplication.Security.Oauth2SuccessHandler;
 import com.authnexus.centralapplication.domains.dto.ApiError;
-import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -22,10 +22,15 @@ import tools.jackson.databind.ObjectMapper;
 
 @Configuration
 @EnableWebSecurity
-@RequiredArgsConstructor
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
+    private final Oauth2SuccessHandler oauth2SuccessHandler;
+
+    public SecurityConfig(JwtAuthFilter jwtAuthFilter, Oauth2SuccessHandler oauth2SuccessHandler) {
+        this.jwtAuthFilter = jwtAuthFilter;
+        this.oauth2SuccessHandler = oauth2SuccessHandler;
+    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -41,7 +46,9 @@ public class SecurityConfig {
                                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/refresh").permitAll()
                                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout").permitAll()
                                 .anyRequest().authenticated()
-                )
+                ).oauth2Login(oauth2 ->
+                        oauth2.successHandler(oauth2SuccessHandler)
+                                .failureHandler(null))
 
                 .logout(AbstractHttpConfigurer::disable)
 

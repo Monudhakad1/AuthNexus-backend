@@ -73,7 +73,7 @@ public class AuthController {
         String refreshToken = jwtServices.generateRefreshToken(user, refreshTokenOp.getJti());  // we can directly use jti dont need to fetch again from database
         String accessToken = jwtServices.generateAccessToken(user);
 
-        cookieService.attackRefreshCookie(response, refreshToken, (int) jwtServices.getRefreshTtlSeconds());
+        cookieService.attachRefreshCookie(response, refreshToken, (int) jwtServices.getRefreshTtlSeconds());
         cookieService.addNoStoreHeaders(response);
         TokenResponse tokenResponse = TokenResponse.of(
                 accessToken,
@@ -148,7 +148,7 @@ public class AuthController {
         String newAccessToken = jwtServices.generateAccessToken(user);
         String newRefreshToken = jwtServices.generateRefreshToken(user, newJti);
 
-        cookieService.attackRefreshCookie(response, newRefreshToken, (int) jwtServices.getRefreshTtlSeconds());
+        cookieService.attachRefreshCookie(response, newRefreshToken, (int) jwtServices.getRefreshTtlSeconds());
         cookieService.addNoStoreHeaders(response);
 
         return ResponseEntity.ok(TokenResponse.of(newAccessToken, newRefreshToken, jwtServices.getAccessTtlSeconds(), mapper.toUserDto(user)));
