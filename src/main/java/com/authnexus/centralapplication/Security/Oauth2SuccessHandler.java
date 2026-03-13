@@ -9,8 +9,10 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.user.OAuth2User;
@@ -22,7 +24,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Component
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class Oauth2SuccessHandler implements AuthenticationSuccessHandler {
 
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
@@ -30,6 +32,9 @@ public class Oauth2SuccessHandler implements AuthenticationSuccessHandler {
     private final JwtServices jwtServices;
     private final CookieService cookieService;
     private final RefreshTokenRepo refreshTokenRepo;
+
+    @Value("${app.auth.frontend-success-redirect}")
+    private String frontEndSuccessUrl;
 
     @Override
     public void onAuthenticationSuccess(
@@ -145,6 +150,7 @@ public class Oauth2SuccessHandler implements AuthenticationSuccessHandler {
          //Return response
 
 //        response.setContentType("application/json");
-        response.getWriter().write("Login successful");
+//        response.getWriter().write("Login successful");
+        response.sendRedirect(frontEndSuccessUrl);
     }
 }
