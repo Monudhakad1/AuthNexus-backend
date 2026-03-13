@@ -1,175 +1,144 @@
 # AuthNexus
 
-AuthNexus is a Spring Boot backend focused on authentication and user management.
+AuthNexus is a Spring Boot backend for authentication and user management.
 
-It currently includes:
-- email/password registration and login
-- JWT access + refresh token flow
-- refresh token rotation with DB persistence
-- user CRUD endpoints
-- role-aware security foundation (`User` implements `UserDetails`)
+## What is implemented
 
-This README is intentionally practical so a new developer can clone, run, and understand the code quickly.
+- Email/password register and login
+- JWT access token + refresh token flow
+- Refresh token rotation with DB persistence
+- Google OAuth2 login
+- User CRUD APIs
 
 ## Tech Stack
 
-- Java (toolchain in `build.gradle` is currently set to `Java 25`)
-- Spring Boot (`4.0.2` in `build.gradle`)
+- Java (toolchain currently set to Java 25)
+- Spring Boot 4
 - Spring Security
 - Spring Data JPA
 - MySQL
+- JJWT
 - Lombok
 - MapStruct
-- JJWT (`io.jsonwebtoken`)
 - Gradle Wrapper
 
 ## Project Layout
 
 ```text
 src/main/java/com/authnexus/centralapplication
-├── config/                # Security configuration
-├── controller/            # REST endpoints (`AuthController`, `UserController`)
-├── domains/
-│   ├── dto/               # API/request/response models
-│   └── entities/          # JPA entities (`User`, `RefreshToken`, ...)
-├── exception/             # Global exception handling
-├── Helper/                # Small helper utilities
-├── Mapper/                # DTO <-> Entity mapping
-├── repository/            # Spring Data repositories
-├── Security/              # JWT, cookie, and auth filter utilities
-└── services/              # Business logic interfaces + implementations
+├── config/        # Security config
+├── controller/    # REST controllers
+├── domains/       # DTOs and entities
+├── exception/     # Global exception handling
+├── Helper/        # Utility helpers
+├── Mapper/        # DTO <-> entity mapping
+├── repository/    # JPA repositories
+├── Security/      # JWT, OAuth2 success handler, cookie service, filters
+└── services/      # Business logic
 ```
 
 ## Prerequisites
 
-- JDK matching your Gradle toolchain (current config: Java 25)
-- MySQL running locally
+- JDK (matching Gradle toolchain)
+- MySQL
 - Git
 
 ## Quick Start
 
-1) Clone and enter the repository
+1) Clone and enter project
+
 ```powershell
-git clone <your-repo-url>
+git clone https://github.com/Monudhakad1/AuthNexus-backend
 cd AuthNexus
 ```
 
-2) Create the database
+2) Create database
+
 ```sql
 CREATE DATABASE authnexus;
 ```
 
-3) Review or update config in `src/main/resources/application-dev.properties`
+3) Update `src/main/resources/application-dev.properties`
+
 - `spring.datasource.url`
 - `spring.datasource.username`
 - `spring.datasource.password`
 - `security.jwt.secret`
+- `spring.security.oauth2.client.registration.google.client-id`
+- `spring.security.oauth2.client.registration.google.client-secret`
 
-4) Run the application
+4) Run app
+
 ```powershell
 .\gradlew.bat bootRun
 ```
 
-By default, `application.properties` points to `dev` profile.
-Current configured ports:
+Default active profile is `dev` (`src/main/resources/application.properties`).
+
+Current ports:
 - `dev`: `8083`
 - `qa`: `8081`
 - `prod`: `8089`
 
-## Running Tests
+## Google OAuth2 Setup (Basic)
+
+In Google Cloud Console:
+
+1) Create OAuth Client ID (Web application)
+2) Add authorized redirect URI:
+
+```text
+http://localhost:8083/login/oauth2/code/google
+```
+
+3) Put client ID/secret in `application-dev.properties` (or env vars)
+
+Start login from browser:
+
+```text
+http://localhost:8083/oauth2/authorization/google
+```
+
+After successful Google login, backend creates/fetches user, stores refresh-token record, and sets refresh cookie.
+
+## Run Tests
 
 ```powershell
 .\gradlew.bat test
 ```
 
-Current test coverage is minimal (`contextLoads` smoke test), so consider adding service and controller tests as you extend features.
+## API Overview
 
-## Configuration Notes
+Auth base path: `/api/v1/auth`
 
-Main property files:
-- `src/main/resources/application.properties`
-- `src/main/resources/application-dev.properties`
-- `src/main/resources/application-qa.properties`
-- `src/main/resources/application-prod.properties`
+- `POST /register` - Register user
+- `POST /login` - Email/password login
+- `POST /refresh` - Issue new access token using refresh token
+- `POST /logout` - Revoke refresh token and clear cookie
 
-JWT-related keys used by the app:
-- `security.jwt.secret`
-- `security.jwt.issuer`
-- `security.jwt.access-ttl-seconds`
-- `security.jwt.refresh-ttl-seconds`
-- `security.jwt.refresh-token-cookie-name`
-- `security.jwt.cookie-secure`
-- `security.jwt.cookie-http-only`
-- `security.jwt.cookie-same-site`
-- `security.jwt.cookie-domain`
-
-For team/project safety, prefer overriding secrets via environment variables instead of committing real secrets.
-
-## API Overview (Current)
-
-Base auth path: `/api/v1/auth`
-
-- `POST /register` - Register a user
-- `POST /login` - Login and receive access token; refresh token is handled with cookie support
-- `POST /refresh` - Rotate refresh token and issue a new access token
-
-Base user path: `/api/v1/users` (secured)
+Users base path: `/api/v1/users` (secured)
 
 - `POST /` - Create user
 - `GET /` - List users
-- `GET /email/{email}` - Fetch user by email
-- `GET /{userId}` - Fetch user by ID
+- `GET /email/{email}` - Get user by email
+- `GET /{userId}` - Get user by id
 - `PUT /{userId}` - Update user
 - `DELETE /{userId}` - Delete user
 
-Security behavior (from current config):
-- Public: `POST /api/v1/auth/register`, `POST /api/v1/auth/login`
-- All other routes require authentication
+OAuth2 entry endpoint:
 
-## Suggested Git Workflow
+- `GET /oauth2/authorization/google`
 
-A lightweight workflow that works well for this repo:
+## Security Notes
 
-- `main` -> stable branch
-- `feature/<short-name>` -> feature branches
-- small PRs with focused scope
+Public endpoints in current config:
 
-Example:
-```powershell
-git checkout -b feature/add-refresh-token-tests
-# make changes
-.\gradlew.bat test
-git add .
-git commit -m "feat(auth): add refresh token service tests"
-git push -u origin feature/add-refresh-token-tests
-```
+- `POST /api/v1/auth/register`
+- `POST /api/v1/auth/login`
+- `POST /api/v1/auth/refresh`
+- `POST /api/v1/auth/logout`
 
-Commit style recommendation:
-- `feat:` new functionality
-- `fix:` bug fixes
-- `refactor:` internal cleanup
-- `test:` test-only changes
-- `docs:` documentation
+All other endpoints require authentication.
 
-## Contribution Checklist
-
-Before opening a PR:
-- pull latest changes from `main`
-- run tests locally
-- avoid committing secrets
-- keep commits readable and intentional
-- include API impact notes if endpoints or contracts changed
-
-## Current Gaps / TODOs Seen in Code
-
-A few areas are marked or implied as in-progress:
-- stronger validation for register/login payloads
-- password update flow should enforce encoding
-- broader automated tests (service/controller/security)
-- role assignment hardening during registration
-
-If you want, I can next generate:
-1. a starter Postman collection for these endpoints
-2. a `.env.example` + cleaned property strategy
-3. a CI workflow (`.github/workflows/ci.yml`) for Gradle test on push/PR
+Use environment variables for secrets in real deployments.
 
