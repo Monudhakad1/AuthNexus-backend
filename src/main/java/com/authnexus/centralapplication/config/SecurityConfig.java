@@ -2,7 +2,6 @@ package com.authnexus.centralapplication.config;
 
 import com.authnexus.centralapplication.Security.JwtAuthFilter;
 import com.authnexus.centralapplication.domains.dto.ApiError;
-import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -40,6 +39,7 @@ public class SecurityConfig {
                                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/register").permitAll()
                                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
                                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/refresh").permitAll()
+                                .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout").permitAll()
                                 .anyRequest().authenticated()
                 )
 
@@ -104,6 +104,5 @@ public class SecurityConfig {
     public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) {
         return configuration.getAuthenticationManager();
     }
-
 
 }

@@ -12,6 +12,7 @@ import com.authnexus.centralapplication.domains.entities.User;
 import com.authnexus.centralapplication.repository.RefreshTokenRepo;
 import com.authnexus.centralapplication.repository.UserRepository;
 import com.authnexus.centralapplication.services.AuthService;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -23,6 +24,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -49,16 +51,16 @@ public class AuthController {
     private final CookieService cookieService;
 
     @PostMapping("/login")
-    public ResponseEntity<TokenResponse> login(@RequestBody LoginRequest loginRequest, HttpServletResponse response ) {
+    public ResponseEntity<TokenResponse> login(@RequestBody LoginRequest loginRequest, HttpServletResponse response) {
 
-        Authentication authenticate= authenticate(loginRequest);
-        User user=userRepository.findByEmail(loginRequest.email()).orElseThrow(()-> new BadCredentialsException("Invalid Username"));
-        if(!user.isEnable()){
+        Authentication authenticate = authenticate(loginRequest);
+        User user = userRepository.findByEmail(loginRequest.email()).orElseThrow(() -> new BadCredentialsException("Invalid Username"));
+        if (!user.isEnable()) {
             throw new DisabledException("User is disabled");
         }
 
         String jti = UUID.randomUUID().toString();
-        var refreshTokenOp= RefreshToken.builder()
+        var refreshTokenOp = RefreshToken.builder()
                 .jti(jti)
                 .user(user)
                 .createdAt(Instant.now())
@@ -68,10 +70,10 @@ public class AuthController {
 
         //save info of rf token
         refreshTokenRepo.save(refreshTokenOp);
-        String  refreshToken=jwtServices.generateRefreshToken(user, refreshTokenOp.getJti());  // we can directly use jti dont need to fetch again from database
-        String accessToken=jwtServices.generateAccessToken(user);
+        String refreshToken = jwtServices.generateRefreshToken(user, refreshTokenOp.getJti());  // we can directly use jti dont need to fetch again from database
+        String accessToken = jwtServices.generateAccessToken(user);
 
-        cookieService.attackRefreshCookie(response, refreshToken,(int)jwtServices.getRefreshTtlSeconds());
+        cookieService.attackRefreshCookie(response, refreshToken, (int) jwtServices.getRefreshTtlSeconds());
         cookieService.addNoStoreHeaders(response);
         TokenResponse tokenResponse = TokenResponse.of(
                 accessToken,
@@ -79,7 +81,7 @@ public class AuthController {
                 jwtServices.getAccessTtlSeconds(),
                 mapper.toUserDto(user)
         );
-       return  ResponseEntity.ok(tokenResponse);
+        return ResponseEntity.ok(tokenResponse);
     }
 
     private Authentication authenticate(LoginRequest loginRequest) {
@@ -95,6 +97,7 @@ public class AuthController {
         }
 
     }
+
     //refresh token regeneration
     @PostMapping("/refresh")
     public ResponseEntity<TokenResponse> refreshToken(
@@ -106,33 +109,33 @@ public class AuthController {
                 .orElseThrow(() -> new BadCredentialsException("Refresh token is missing"));
 
         // call service layer
-        if(jwtServices.isAccessToken(refreshToken)){
+        if (jwtServices.isAccessToken(refreshToken)) {
             throw new BadCredentialsException("Provided token is not a refresh token");
         }
 
         String jti = jwtServices.getJti(refreshToken);
-        UUID userId=jwtServices.getUserId(jti);
-        RefreshToken storedRefreshToken= refreshTokenRepo.findByJti(jti).orElseThrow(()-> new BadCredentialsException("Invalid refresh token"));
-        if(storedRefreshToken.isRevoked()){
-            throw new  BadCredentialsException("Refresh token is revoked");
+        UUID userId = jwtServices.getUserId(jti);
+        RefreshToken storedRefreshToken = refreshTokenRepo.findByJti(jti).orElseThrow(() -> new BadCredentialsException("Invalid refresh token"));
+        if (storedRefreshToken.isRevoked()) {
+            throw new BadCredentialsException("Refresh token is revoked");
         }
 
-        if(storedRefreshToken.getExpiresAt().isBefore(Instant.now())){
+        if (storedRefreshToken.getExpiresAt().isBefore(Instant.now())) {
             throw new BadCredentialsException("Refresh token is expired");
         }
 
-        if(!storedRefreshToken.getUser().getId().equals(userId)){
+        if (!storedRefreshToken.getUser().getId().equals(userId)) {
             throw new BadCredentialsException("Refresh token does not belong to the expected user");
         }
 
         storedRefreshToken.setRevoked(true);
-        String newJti=UUID.randomUUID().toString();
+        String newJti = UUID.randomUUID().toString();
         storedRefreshToken.setReplacedByToken(newJti);
         refreshTokenRepo.save(storedRefreshToken);
 
-        User user=storedRefreshToken.getUser();
+        User user = storedRefreshToken.getUser();
 
-        var newRefreshTokenOp= RefreshToken.builder()
+        var newRefreshTokenOp = RefreshToken.builder()
                 .jti(newJti)
                 .user(user)
                 .createdAt(Instant.now())
@@ -142,16 +145,38 @@ public class AuthController {
 
         refreshTokenRepo.save(newRefreshTokenOp);
 
-        String  newAccessToken=jwtServices.generateAccessToken(user);
-        String newRefreshToken=jwtServices.generateRefreshToken(user, newJti);
+        String newAccessToken = jwtServices.generateAccessToken(user);
+        String newRefreshToken = jwtServices.generateRefreshToken(user, newJti);
 
-        cookieService.attackRefreshCookie(response, newRefreshToken,(int)jwtServices.getRefreshTtlSeconds());
+        cookieService.attackRefreshCookie(response, newRefreshToken, (int) jwtServices.getRefreshTtlSeconds());
         cookieService.addNoStoreHeaders(response);
 
-        return ResponseEntity.ok(TokenResponse.of(newAccessToken,refreshToken,jwtServices.getAccessTtlSeconds(),mapper.toUserDto(user)));
+        return ResponseEntity.ok(TokenResponse.of(newAccessToken, newRefreshToken, jwtServices.getAccessTtlSeconds(), mapper.toUserDto(user)));
 
     }
 
+    @PostMapping("/logout")
+    public ResponseEntity<TokenResponse> logout(
+            HttpServletResponse response,
+            HttpServletRequest request
+    ){
+        readRefreshTokenFromRequest(null, request).ifPresent(rt -> {
+            try {
+                String jti = jwtServices.getJti(rt);
+                refreshTokenRepo.findByJti(jti).ifPresent(storedRt -> {
+                    storedRt.setRevoked(true);
+                    refreshTokenRepo.save(storedRt);
+                });
+            } catch (JwtException e) {
+
+            }
+        });
+        cookieService.clearRefreshCookie(response);
+        cookieService.addNoStoreHeaders(response);
+        SecurityContextHolder.clearContext();
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+
+    }
     private Optional<String> readRefreshTokenFromRequest(
             RefreshTokenRequest body,
             HttpServletRequest request) {
@@ -161,32 +186,32 @@ public class AuthController {
         }
 
         if (request.getCookies() != null) {
-            Optional<String>fromCookie = Arrays.stream(request.getCookies())
+            Optional<String> fromCookie = Arrays.stream(request.getCookies())
                     .filter(c -> cookieService.getRefreshTokenCookieName().equals(c.getName()))
                     .map(Cookie::getValue)
-                    .filter(v-> !v.isBlank())
+                    .filter(v -> !v.isBlank())
                     .findFirst();
-            if(fromCookie.isPresent()) {
+            if (fromCookie.isPresent()) {
                 return fromCookie;
             }
         }
-        if(body!=null && body.refreshToken()!=null && !body.refreshToken().isBlank()){
+        if (body != null && body.refreshToken() != null && !body.refreshToken().isBlank()) {
             return Optional.of(body.refreshToken());
         }
 
         String refreshHeader = request.getHeader("X-Refresh-Token");
-        if(refreshHeader!=null && !refreshHeader.isEmpty()){
+        if (refreshHeader != null && !refreshHeader.isEmpty()) {
             return Optional.of(refreshHeader);
         }
-        String authHeader=request.getHeader("Authorization");
-        if(authHeader!=null && authHeader.regionMatches(true,0,"Bearer",0,7 )){
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.regionMatches(true, 0, "Bearer", 0, 7)) {
             String candidate = authHeader.substring(7).trim();
-            if(!candidate.isEmpty()){
-                try{
-                    if(jwtServices.isRefreshToken(candidate)){
+            if (!candidate.isEmpty()) {
+                try {
+                    if (jwtServices.isRefreshToken(candidate)) {
                         return Optional.of(candidate);
                     }
-                }catch (Exception e){
+                } catch (Exception e) {
 
                 }
             }
