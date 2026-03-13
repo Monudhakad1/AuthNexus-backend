@@ -68,6 +68,37 @@ public class Oauth2SuccessHandler implements AuthenticationSuccessHandler {
                         .imageUrl(picture)
                         .enable(true)
                         .provider(Provider.GOOGLE)
+                        .providerId(googleId)
+                        .build();
+
+                user = userRepository.findByEmail(email)
+                        .orElseGet(() -> {
+                            User savedUser = userRepository.save(newUser);
+                            logger.info("User created: {}", savedUser.getEmail());
+                            return savedUser;
+                        });
+
+                logger.info("User resolved: {}", user.getEmail());
+            }
+
+            case "github" -> {
+                String name = String.valueOf(oAuth2User.getAttributes().getOrDefault("login", ""));
+                String email = String.valueOf(oAuth2User.getAttributes().getOrDefault("email", ""));
+                String githubId = String.valueOf(oAuth2User.getAttributes().getOrDefault("id", ""));
+                String imageUrl = String.valueOf(oAuth2User.getAttributes().getOrDefault("avatar_url", ""));
+
+                // GitHub may not return email unless proper scope is granted.
+                if (email == null || email.isBlank()) {
+                  email=name+"@github.com";
+                }
+
+                User newUser = User.builder()
+                        .email(email)
+                        .name(name)
+                        .imageUrl(imageUrl)
+                        .enable(true)
+                        .provider(Provider.GITHUB)
+                        .providerId(githubId)
                         .build();
 
                 user = userRepository.findByEmail(email)
