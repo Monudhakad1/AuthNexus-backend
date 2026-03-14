@@ -76,8 +76,7 @@ public class AuthController {
         cookieService.attachRefreshCookie(response, refreshToken, (int) jwtServices.getRefreshTtlSeconds());
         cookieService.addNoStoreHeaders(response);
         TokenResponse tokenResponse = TokenResponse.of(
-                accessToken,
-                "",
+                accessToken, refreshToken,
                 jwtServices.getAccessTtlSeconds(),
                 mapper.toUserDto(user)
         );
